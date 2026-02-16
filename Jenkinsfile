@@ -2,7 +2,7 @@ pipeline {
   agent any
 
   environment {
-    IMAGE_NAME = "yourdockerhubusername/lecture-intel"
+    IMAGE_NAME = "amarender01/lecture-intel"
     IMAGE_TAG  = "latest"
     DOCKERHUB_CREDS = "dockerhub-creds"   // Jenkins Credentials ID (Username+Password)
     DEPLOY_HOST = "your.server.ip"        // or hostname
