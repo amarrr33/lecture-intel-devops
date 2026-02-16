@@ -1,0 +1,7 @@
+services:
+  lecture-intel:
+    image: yourdockerhubusername/lecture-intel:latest
+    container_name: lecture-intel
+    ports:
+      - "8000:8000"
+    restart: unless-stopped
