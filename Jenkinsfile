@@ -41,30 +41,6 @@ pipeline {
           '''
         }
       }
-    }
-
-    stage('Deploy (Docker Compose on Server)') {
-      steps {
-        sshagent(credentials: ["$SSH_CREDS"]) {
-          sh '''
-            ssh -o StrictHostKeyChecking=no $DEPLOY_USER@$DEPLOY_HOST "
-              mkdir -p ~/lecture-intel &&
-              cd ~/lecture-intel &&
-              if [ ! -f docker-compose.yml ]; then
-                echo 'services:\n  lecture-intel:\n    image: '$IMAGE_NAME':'$IMAGE_TAG'\n    container_name: lecture-intel\n    ports:\n      - \"8000:8000\"\n    restart: unless-stopped' > docker-compose.yml
-              fi &&
-              docker compose pull &&
-              docker compose up -d
-            "
-          '''
-        }
-      }
-    }
-
-    stage('Health Check') {
-      steps {
-        sh 'curl -f http://$DEPLOY_HOST:8000/health'
-      }
-    }
+    }   
   }
 }
