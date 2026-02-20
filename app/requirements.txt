@@ -2,7 +2,6 @@ fastapi==0.115.8
 uvicorn[standard]==0.34.0
 
 yt-dlp==2025.1.26
-openai-whisper==20240930
 
 python-pptx==1.0.2
 pdfplumber==0.11.5
@@ -14,6 +13,5 @@ numpy==2.2.3
 scikit-learn==1.6.1
 
 # MLP confidence + T5 generation
-torch==2.2.2
 transformers==4.48.3
 sentencepiece==0.2.0
