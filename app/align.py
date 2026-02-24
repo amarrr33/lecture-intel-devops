@@ -1,19 +1,27 @@
 from __future__ import annotations
+
 from typing import List, Dict, Any, Optional, Tuple
 import numpy as np
-
 from sklearn.metrics.pairwise import cosine_similarity
 
+# ---- Global singleton embedder (prevents repeated HF checks) ----
+_EMB_MODEL = None
+_EMB_MODEL_NAME = None
+
+def get_embedder(model_name: str = "sentence-transformers/all-MiniLM-L6-v2"):
+    global _EMB_MODEL, _EMB_MODEL_NAME
+    if _EMB_MODEL is None or _EMB_MODEL_NAME != model_name:
+        from sentence_transformers import SentenceTransformer
+        _EMB_MODEL = SentenceTransformer(model_name)
+        _EMB_MODEL_NAME = model_name
+    return _EMB_MODEL
+
 def embed_texts(texts: List[str], model_name: str = "sentence-transformers/all-MiniLM-L6-v2") -> np.ndarray:
-    from sentence_transformers import SentenceTransformer
-    m = SentenceTransformer(model_name)
-    embs = m.encode(texts, normalize_embeddings=True)
+    m = get_embedder(model_name)
+    embs = m.encode(texts, normalize_embeddings=True, show_progress_bar=False)
     return np.asarray(embs, dtype=np.float32)
 
 def _make_chunks(segments: List[Dict[str, Any]], chunk_size: int = 2) -> List[Dict[str, Any]]:
-    """
-    Merge adjacent transcript segments into larger chunks to help refinement.
-    """
     out = []
     i = 0
     while i < len(segments):
@@ -38,12 +46,9 @@ def align_slides_to_transcript(
     refine_window: int = 6,
 ) -> Dict[str, Any]:
     """
-    Full alignment:
-      1) MiniLM embeddings + cosine => initial best per slide
-      2) MLP confidence => confidence score for chosen pair
-      3) iterative refinement if confidence < threshold:
-         - search in a +/- window around initial index
-         - also try larger speech chunks (merged segments)
+    1) MiniLM embeddings + cosine => initial best per slide
+    2) MLP confidence => confidence score for chosen pair (optional)
+    3) iterative refinement if confidence < threshold
     """
     from app.confidence import load_confidence_model, features_from_pair
 
@@ -51,19 +56,19 @@ def align_slides_to_transcript(
     if not segs:
         raise ValueError("No transcript segments found (Whisper returned empty).")
 
-    slide_strings = [s["text"] if s["text"] else "(empty)" for s in slide_texts]
+    slide_strings = [s["text"] if s.get("text") else "(empty)" for s in slide_texts]
     seg_strings = [s.get("text","").strip() for s in segs]
 
+    # embeddings (model loaded once)
     S = embed_texts(slide_strings, model_name=model_name)
     T = embed_texts(seg_strings, model_name=model_name)
 
     sims = cosine_similarity(S, T)  # [num_slides, num_segments]
     best = sims.argmax(axis=1)
-    best_scores = sims.max(axis=1)
 
     # Load MLP confidence model if provided
     cm = None
-    in_dim = 1 + (S.shape[1] * 4)  # [cos] + |a-b| + a*b + a + b  => 1 + 4*d
+    in_dim = 1 + (S.shape[1] * 4)  # [cos] + |a-b| + a*b + a + b => 1 + 4*d
     if confidence_model_path:
         try:
             cm = load_confidence_model(confidence_model_path, in_dim=in_dim, device="cpu")
@@ -71,10 +76,9 @@ def align_slides_to_transcript(
             cm = None
 
     def score_pair(i_slide: int, j_seg: int) -> Tuple[float, float]:
-        """returns (cosine, confidence)"""
-        cos = float(np.dot(S[i_slide], T[j_seg]))  # normalized
+        cos = float(np.dot(S[i_slide], T[j_seg]))  # normalized cosine
         if cm is None:
-            return cos, cos  # fallback: use cosine as "confidence"
+            return cos, cos
         feat = features_from_pair(S[i_slide], T[j_seg])[None, :]
         conf = float(cm.predict_proba(feat)[0])
         return cos, conf
@@ -99,7 +103,7 @@ def align_slides_to_transcript(
     # Iterative refinement
     for _round in range(refine_rounds):
         changed = 0
-        # try merged chunks too
+
         merged = _make_chunks(segs, chunk_size=2)
         merged_texts = [m["text"] for m in merged]
         MT = embed_texts(merged_texts, model_name=model_name)
@@ -112,29 +116,21 @@ def align_slides_to_transcript(
             lo = max(0, cur_j - refine_window)
             hi = min(len(segs), cur_j + refine_window + 1)
 
-            # search best within window using confidence (or cosine fallback)
             best_j, best_conf, best_cos = cur_j, alignments[i]["confidence"], alignments[i]["cosine"]
             for j in range(lo, hi):
                 cos, conf = score_pair(i, j)
                 if conf > best_conf:
                     best_conf, best_cos, best_j = conf, cos, j
 
-            # also try merged-chunk match (coarse)
-            # pick best merged chunk by cosine with slide embedding
             sims_m = (S[i] @ MT.T)
             mj = int(sims_m.argmax())
             mcos = float(sims_m[mj])
-            mconf = mcos  # merged confidence fallback
+            mconf = mcos
             if cm is not None:
-                # build a fake "segment vector" from merged embedding
-                # (use same feature function)
-                from app.confidence import features_from_pair
                 feat = features_from_pair(S[i], MT[mj])[None, :]
                 mconf = float(cm.predict_proba(feat)[0])
 
-            # choose between refined single segment vs merged chunk
             if mconf > best_conf:
-                # write merged as segment
                 alignments[i]["best_segment_idx"] = int(merged[mj]["source_idxs"][0])
                 alignments[i]["cosine"] = float(mcos)
                 alignments[i]["confidence"] = float(mconf)

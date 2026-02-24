@@ -21,4 +21,9 @@ RUN pip install --no-cache-dir -r /app/requirements.txt
 COPY app /app/app
 
 EXPOSE 8000
+<<<<<<< HEAD
 CMD ["uvicorn", "app.main:app", "--host", "0.0.0.0", "--port", "8000"]
+=======
+CMD ["uvicorn", "app.main:app", "--host", "0.0.0.0", "--port", "8000"]
+
+>>>>>>> 5fb3ed9 (baseline: flan-t5 prompts + materials pipeline (still blank outputs))
