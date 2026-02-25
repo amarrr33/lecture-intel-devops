@@ -21,83 +21,70 @@ def clean_text(t: str) -> str:
 
 
 # ---------------------------
-# SMART FUSION (KEY FIX 🚀)
-# ---------------------------
-
-def combine_slide_and_speech(slide: str, speech: str) -> str:
-    """
-    CORE IDEA:
-    - Slides = structure
-    - Speech = depth
-    """
-
-    slide = clean_text(slide)
-    speech = clean_text(speech)
-
-    if not slide and not speech:
-        return ""
-
-    # prioritize slide keywords
-    if len(slide) > 20:
-        return f"""
-Topic from slide:
-{slide}
-
-Detailed explanation from lecture:
-{speech}
-""".strip()
-
-    # fallback if slide weak
-    return speech
-
-
-# ---------------------------
 # QUALITY CHECK
 # ---------------------------
 
-def is_bad(out: str) -> bool:
-    if not out or len(out.strip()) < 40:
+_BAD_MARKERS = ["###", "instruction", "task:", "output:", "true", "false"]
+
+def looks_bad(out: str) -> bool:
+    if not out or len(out.strip()) < 60:
         return True
-    low = out.lower()
-    if "task" in low or "instruction" in low:
+    lo = out.lower()
+    if any(m in lo for m in _BAD_MARKERS):
         return True
     return False
 
 
+def _safe_json_loads(s: str):
+    try:
+        return json.loads(s)
+    except:
+        return None
+
+
 # ---------------------------
-# GEMINI (OPTIONAL)
+# GEMINI
 # ---------------------------
 
-def use_gemini() -> bool:
-    return os.getenv("GEN_PROVIDER", "t5") == "gemini" and os.getenv("GEMINI_API_KEY")
+def _gemini_available():
+    return bool(os.getenv("GEMINI_API_KEY"))
 
-
-def gemini_generate(prompt: str) -> str:
+def _gemini_generate(prompt: str) -> str:
     import google.generativeai as genai
     genai.configure(api_key=os.getenv("GEMINI_API_KEY"))
-    model = genai.GenerativeModel("gemini-1.5-flash")
-    return model.generate_content(prompt).text.strip()
+    model = genai.GenerativeModel(os.getenv("GEMINI_MODEL", "gemini-1.5-flash"))
+    resp = model.generate_content(prompt)
+    return (resp.text or "").strip()
+
+
+def use_gemini():
+    return os.getenv("GEN_PROVIDER", "t5") == "gemini" and _gemini_available()
 
 
 # ---------------------------
-# T5 GENERATOR
+# T5
 # ---------------------------
 
-class T5:
-    def __init__(self):
-        self.tok = AutoTokenizer.from_pretrained("google/flan-t5-base")
-        self.model = AutoModelForSeq2SeqLM.from_pretrained("google/flan-t5-base")
+class T5Generator:
 
-    def run(self, prompt: str, max_tokens=300):
-        inputs = self.tok(prompt, return_tensors="pt", truncation=True, max_length=512)
+    def __init__(self, model_name="google/flan-t5-base", device="cpu"):
+        self.device = device
+        self.tok = AutoTokenizer.from_pretrained(model_name)
+        self.model = AutoModelForSeq2SeqLM.from_pretrained(model_name).to(device)
+
+    def run(self, prompt: str, max_tokens=512):
+        inp = self.tok(prompt, return_tensors="pt", truncation=True, max_length=512).to(self.device)
+
         with torch.no_grad():
             out = self.model.generate(
-                **inputs,
+                **inp,
                 max_new_tokens=max_tokens,
                 do_sample=True,
                 temperature=0.7,
-                top_p=0.9
+                top_p=0.9,
+                no_repeat_ngram_size=3,
             )
+
         return self.tok.decode(out[0], skip_special_tokens=True)
 
 
@@ -106,146 +93,199 @@ _T5 = None
 def get_t5():
     global _T5
     if _T5 is None:
-        _T5 = T5()
+        _T5 = T5Generator()
     return _T5
 
 
 # ---------------------------
-# NOTES
+# TOPIC-AWARE NOTES (NEW 🔥)
 # ---------------------------
 
-def generate_notes(slide: str, speech: str) -> str:
-    text = combine_slide_and_speech(slide, speech)
+def generate_topic_notes(topic: str, slide: str, speech: str) -> str:
+
+    combined = f"""
+TOPIC: {topic}
+
+SLIDE CONTENT:
+{slide}
+
+LECTURE EXPLANATION:
+{speech}
+"""
 
     prompt = f"""
-Create detailed study notes.
+You are a top university professor.
 
-Content:
-{text}
+Create HIGH-QUALITY exam notes using BOTH slide + lecture explanation.
 
 Rules:
-- Give proper explanation
-- Include WHY and HOW
-- Add examples if possible
-- No headings like TASK
+- Combine both sources
+- Add missing explanation if slide is vague
+- Add examples if lecture mentions them
+- Do NOT copy text blindly
+
+OUTPUT FORMAT:
+Title: {topic}
+- detailed explanation
+- key reasoning
+- examples if possible
+
+Key Terms:
+- term: definition
+- term: definition
+
+CONTENT:
+{combined}
 """
 
+    # Prefer Gemini
     if use_gemini():
-        out = gemini_generate(prompt)
-    else:
-        out = get_t5().run(prompt)
+        out = _gemini_generate(prompt)
+        if not looks_bad(out):
+            return out
 
-    return "" if is_bad(out) else out
-
-
-# ---------------------------
-# SUMMARY
-# ---------------------------
-
-def generate_summary(text: str) -> str:
-    prompt = f"""
-Write a detailed lecture summary.
-
-IMPORTANT:
-- Explain concepts clearly
-- Expand topics (don't just repeat)
-- Add missing explanation if needed
-
-Lecture:
-{text[:6000]}
-"""
-
-    if use_gemini():
-        out = gemini_generate(prompt)
-    else:
-        out = get_t5().run(prompt, 500)
-
-    return "" if is_bad(out) else out
+    # fallback T5
+    gen = get_t5()
+    out = gen.run(prompt, 400)
+    return "" if looks_bad(out) else out
 
 
 # ---------------------------
-# FLASHCARDS
+# SLIDEWISE NOTES (UPDATED)
 # ---------------------------
 
-def generate_flashcards(text: str) -> List[Dict]:
-    prompt = f"""
-Create 10 high quality flashcards.
+def generate_slidewise_notes(slides, alignment, topics=None):
 
-Return JSON:
-[
-  {{"q":"...","a":"..."}}
-]
-
-Lecture:
-{text[:5000]}
-"""
-
-    if use_gemini():
-        out = gemini_generate(prompt)
-    else:
-        out = get_t5().run(prompt, 400)
-
-    try:
-        return json.loads(out)
-    except:
-        return []
-
-
-# ---------------------------
-# QUESTIONS + ANSWERS
-# ---------------------------
-
-def generate_qa(text: str) -> Dict:
-    prompt = f"""
-Create exam questions WITH answers.
-
-Return JSON:
-{{
- "2": [{{"q":"...","a":"..."}}],
- "5": [...],
- "10": [...]
-}}
-
-Lecture:
-{text[:6000]}
-"""
-
-    if use_gemini():
-        out = gemini_generate(prompt)
-    else:
-        out = get_t5().run(prompt, 500)
-
-    try:
-        return json.loads(out)
-    except:
-        return {}
-
-
-# ---------------------------
-# PIPELINE FUNCTIONS
-# ---------------------------
-
-def generate_slidewise_notes(slides, alignment):
     notes = []
-    for a in alignment.get("alignments", []):
-        slide = next((s["text"] for s in slides if s["slide_id"] == a["slide_id"]), "")
-        speech = a.get("segment", {}).get("text", "")
+    by_id = {s["slide_id"]: clean_text(s.get("text")) for s in slides}
 
-        note = generate_notes(slide, speech)
+    for a in alignment.get("alignments", []):
+
+        sid = a["slide_id"]
+        slide_text = by_id.get(sid, "")
+        speech = clean_text(a["segment"]["text"])
+
+        # 🔥 NEW: topic selection
+        topic = sid
+        if topics:
+            topic = topics.get(sid, sid)
+
+        note = generate_topic_notes(topic, slide_text, speech)
+
+        if not note:
+            continue
 
         notes.append({
-            "slide_id": a["slide_id"],
-            "note": note
+            "slide_id": sid,
+            "note": note,
+            "confidence": a.get("confidence", 0)
         })
 
     return notes
 
 
+# ---------------------------
+# LECTURE MATERIALS (STRONG)
+# ---------------------------
+
 def generate_lecture_materials(transcript: Dict[str, Any]):
-    text = transcript.get("text", "")
+
+    text = clean_text(transcript.get("text", ""))[:12000]
+
+    if not text:
+        return {}
+
+    # ---------- SUMMARY ----------
+    summary_prompt = f"""
+Create a COMPLETE STUDY SUMMARY.
+
+DO NOT just summarize — EXPAND concepts.
+
+Include:
+- explanations
+- examples
+- real-world intuition
+
+FORMAT:
+Key Concepts:
+- ...
+
+Examples:
+- ...
+
+Exam Takeaways:
+- ...
+
+TEXT:
+{text}
+"""
+
+    # ---------- FLASHCARDS ----------
+    flash_prompt = f"""
+Generate 20 HIGH-QUALITY flashcards.
+
+Return JSON:
+[
+{{"q":"","a":"","topic":"","memory_anchor":""}}
+]
+
+TEXT:
+{text}
+"""
+
+    # ---------- QUESTIONS ----------
+    qa_prompt = f"""
+Generate exam questions WITH answers.
+
+Return JSON:
+{{
+"1-4": [],
+"5": [],
+"10": [],
+"15": []
+}}
+
+TEXT:
+{text}
+"""
+
+    if use_gemini():
+        summary = _gemini_generate(summary_prompt)
+        flash = _safe_json_loads(_gemini_generate(flash_prompt))
+        qa = _safe_json_loads(_gemini_generate(qa_prompt))
+
+        return {
+            "summary": summary,
+            "flashcards": flash or [],
+            "qa_questions": qa or {}
+        }
+
+    # fallback T5
+    gen = get_t5()
+
+    summary = gen.run(summary_prompt, 600)
+    flash = []
+    qa = {}
 
     return {
-        "summary": generate_summary(text),
-        "flashcards": generate_flashcards(text),
-        "questions": generate_qa(text),
+        "summary": summary if not looks_bad(summary) else "",
+        "flashcards": flash,
+        "qa_questions": qa
     }
+
+
+# ---------------------------
+# FLASHCARD MARKDOWN
+# ---------------------------
+
+def flashcards_to_markdown(cards):
+
+    if not cards:
+        return ""
+
+    lines = ["| Q | A | Topic | Memory |", "|---|---|---|---|"]
+
+    for c in cards:
+        lines.append(f"| {c['q']} | {c['a']} | {c['topic']} | {c['memory_anchor']} |")
+
+    return "\n".join(lines)
