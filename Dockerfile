@@ -19,7 +19,8 @@ RUN pip install "numpy<2"
 RUN pip install torch torchvision torchaudio --index-url https://download.pytorch.org/whl/cpu
 RUN pip install -r requirements.txt
 
-COPY app /app/app
+COPY . /app
+ENV PYTHONPATH=/app
 
 EXPOSE 8000
 

@@ -1,5 +1,5 @@
 from __future__ import annotations
-
+from app.embeddings import embed_texts
 from typing import Dict, Any, List
 import numpy as np
 from sklearn.metrics.pairwise import cosine_similarity

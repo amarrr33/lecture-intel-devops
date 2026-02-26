@@ -1,0 +1,10 @@
+data/
+runs/
+outputs/
+__pycache__/
+*.pyc
+*.pkl
+*.pt
+*.bin
+.git/
+.env

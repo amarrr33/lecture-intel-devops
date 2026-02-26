@@ -3,12 +3,19 @@ from __future__ import annotations
 from typing import List, Dict, Any
 import numpy as np
 
-from app.align import embed_texts
+from app.align import embed_texts  # ✅ only this
 
+# ---------------------------
+# cosine similarity
+# ---------------------------
 
 def _cos_sim(a: np.ndarray, b: np.ndarray) -> float:
     return float(np.dot(a, b))
 
+
+# ---------------------------
+# MAIN SEGMENTATION
+# ---------------------------
 
 def segment_topics(
     segments: List[Dict[str, Any]],
@@ -17,16 +24,7 @@ def segment_topics(
     min_chunk_size: int = 2,
     max_chunk_size: int = 12,
 ) -> List[Dict[str, Any]]:
-    """
-    Break transcript into semantic topic chunks using embedding similarity.
 
-    Strategy:
-    - Embed each segment
-    - Merge consecutive segments while similarity is high
-    - Split when topic shift detected
-    """
-
-    # clean segments
     segs = [s for s in segments if (s.get("text") or "").strip()]
     if not segs:
         return []
@@ -36,7 +34,7 @@ def segment_topics(
     # embeddings
     E = embed_texts(texts, model_name=model_name)
 
-    topics: List[Dict[str, Any]] = []
+    topics = []
 
     current_chunk = {
         "start": segs[0]["start"],
@@ -46,14 +44,11 @@ def segment_topics(
     }
 
     def finalize_chunk(chunk):
-        full_text = " ".join(chunk["texts"]).strip()
-        avg_emb = np.mean(chunk["embs"], axis=0)
         return {
             "start": chunk["start"],
             "end": chunk["end"],
-            "text": full_text,
+            "text": " ".join(chunk["texts"]).strip(),
             "length": len(chunk["texts"]),
-            "embedding": avg_emb.tolist(),  # optional (can remove later)
         }
 
     for i in range(1, len(segs)):
@@ -62,7 +57,6 @@ def segment_topics(
 
         sim = _cos_sim(prev_emb, cur_emb)
 
-        # 🔥 decide whether to continue or split
         should_split = (
             sim < similarity_threshold and len(current_chunk["texts"]) >= min_chunk_size
         ) or len(current_chunk["texts"]) >= max_chunk_size
@@ -81,20 +75,17 @@ def segment_topics(
             current_chunk["embs"].append(cur_emb)
             current_chunk["end"] = segs[i]["end"]
 
-    # last chunk
     if current_chunk["texts"]:
         topics.append(finalize_chunk(current_chunk))
 
     return topics
 
 
-def merge_small_topics(
-    topics: List[Dict[str, Any]],
-    min_length: int = 2,
-) -> List[Dict[str, Any]]:
-    """
-    Merge very small topics into neighbors to avoid fragmentation.
-    """
+# ---------------------------
+# MERGE SMALL TOPICS
+# ---------------------------
+
+def merge_small_topics(topics, min_length=2):
 
     if not topics:
         return []
@@ -107,7 +98,6 @@ def merge_small_topics(
             if buffer is None:
                 buffer = t
             else:
-                # merge into buffer
                 buffer["text"] += " " + t["text"]
                 buffer["end"] = t["end"]
                 buffer["length"] += t["length"]
@@ -125,29 +115,13 @@ def merge_small_topics(
     return merged
 
 
-def extract_topics(
-    segments: List[Dict[str, Any]],
-    model_name: str = "sentence-transformers/all-MiniLM-L6-v2",
-) -> List[Dict[str, Any]]:
-    """
-    Main entry point.
+# ---------------------------
+# FINAL ENTRY
+# ---------------------------
 
-    Returns clean topic chunks:
-    [
-      {
-        "start": float,
-        "end": float,
-        "text": str,
-        "length": int
-      }
-    ]
-    """
+def extract_topics(segments):
 
-    raw_topics = segment_topics(segments, model_name=model_name)
-    final_topics = merge_small_topics(raw_topics)
+    raw = segment_topics(segments)
+    final = merge_small_topics(raw)
 
-    # remove embeddings before returning (not needed downstream)
-    for t in final_topics:
-        t.pop("embedding", None)
-
-    return final_topics
+    return final
