@@ -16,14 +16,16 @@ def save_markdown(alignment: Dict[str, Any], out_path: str | Path) -> None:
     stats = alignment.get("stats", {})
     lines.append(f"- Slides: **{stats.get('num_slides')}**")
     lines.append(f"- Transcript segments: **{stats.get('num_segments')}**")
-    lines.append(f"- Avg best similarity: **{stats.get('avg_best_score'):.3f}**\n")
+    avg_conf = stats.get('avg_confidence', 0.0)
+    lines.append(f"- Avg confidence: **{avg_conf:.3f}**\n")
 
     for a in alignment.get("alignments", []):
-        seg = a["segment"]
-        lines.append(f"## {a['slide_id']}")
-        lines.append(f"- Best segment: `{a['best_segment_idx']}`")
-        lines.append(f"- Score: **{a['score']:.3f}**")
-        lines.append(f"- Time: **{seg['start']:.1f}s → {seg['end']:.1f}s**")
-        lines.append(f"- Text: {seg['text']}\n")
+        seg = a.get("segment", {})
+        lines.append(f"## {a.get('slide_id', 'unknown')}")
+        lines.append(f"- Best segment: `{a.get('best_segment_idx')}`")
+        lines.append(f"- Cosine: **{a.get('cosine', 0.0):.3f}**")
+        lines.append(f"- Confidence: **{a.get('confidence', 0.0):.3f}**")
+        lines.append(f"- Time: **{seg.get('start', 0.0):.1f}s → {seg.get('end', 0.0):.1f}s**")
+        lines.append(f"- Text: {seg.get('text', '')}\n")
 
     out_path.write_text("\n".join(lines), encoding="utf-8")

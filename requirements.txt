@@ -13,6 +13,8 @@ numpy==2.2.3
 scikit-learn==1.6.1
 
 # MLP confidence + T5 generation
+torch==2.6.0
 transformers==4.48.3
 sentencepiece==0.2.0
-google-generativeai>=0.7.0
+google-genai>=0.1.0
+python-dotenv>=1.0.0
