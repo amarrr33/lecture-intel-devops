@@ -26,30 +26,20 @@ COPY requirements.txt requirements.txt
 RUN pip install --upgrade pip setuptools wheel
 
 # --------------------------------------------------
-# Install PyTorch CPU (small build)
+# Install PyTorch CPU
 # --------------------------------------------------
 
-RUN pip install --no-cache-dir torch==2.2.2+cpu \
-    -f https://download.pytorch.org/whl/torch_stable.html
+RUN pip install --no-cache-dir \
+    torch==2.2.2+cpu \
+    torchvision==0.17.2+cpu \
+    torchaudio==2.2.2+cpu \
+    --index-url https://download.pytorch.org/whl/cpu
 
 # --------------------------------------------------
 # Install Whisper
 # --------------------------------------------------
 
 RUN pip install --no-cache-dir openai-whisper
-
-# --------------------------------------------------
-# Fix numpy compatibility
-# --------------------------------------------------
-
-RUN pip install "numpy<2"
-
-# --------------------------------------------------
-# Install other torch libs (CPU only)
-# --------------------------------------------------
-
-RUN pip install torchvision torchaudio \
-    --index-url https://download.pytorch.org/whl/cpu
 
 # --------------------------------------------------
 # Install YouTube downloader
@@ -62,6 +52,13 @@ RUN pip install yt-dlp
 # --------------------------------------------------
 
 RUN pip install -r requirements.txt
+
+# --------------------------------------------------
+# Fix dependency conflicts
+# --------------------------------------------------
+
+RUN pip uninstall -y numpy requests && \
+    pip install numpy==1.26.4 requests==2.31.0
 
 # --------------------------------------------------
 # Copy project files
