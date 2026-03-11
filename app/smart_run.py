@@ -3,29 +3,41 @@ import subprocess
 from pathlib import Path
 import shutil
 import uuid
+import sys
 
 DATA_DIR = Path("data/lectures")
 
 
+# --------------------------------------------------
+# Download YouTube audio
+# --------------------------------------------------
+
 def download_youtube_audio(url, out_dir):
+
     out = out_dir / f"{uuid.uuid4()}.mp3"
 
     cmd = [
-        "python",
+        sys.executable,
         "-m",
         "yt_dlp",
+        "-f", "bestaudio[ext=m4a]/bestaudio",
         "-x",
-        "--audio-format",
-        "mp3",
+        "--audio-format", "mp3",
+        "--no-part",
+        "--force-overwrites",
+        "--no-progress",
         url,
-        "-o",
-        str(out)
+        "-o", str(out)
     ]
 
-    subprocess.run(cmd, check=True)
+    subprocess.run(cmd)
 
     return out
 
+
+# --------------------------------------------------
+# Merge multiple audio files
+# --------------------------------------------------
 
 def merge_audios(audio_files, out_path):
 
@@ -51,20 +63,28 @@ def merge_audios(audio_files, out_path):
     return out_path
 
 
+# --------------------------------------------------
+# Convert PPT → PDF using LibreOffice
+# --------------------------------------------------
+
 def convert_ppt_to_pdf(ppt_path):
 
     pdf = ppt_path.with_suffix(".pdf")
 
     subprocess.run([
-        "libreoffice",
+        r"C:\Program Files\LibreOffice\program\soffice.exe",
         "--headless",
         "--convert-to",
         "pdf",
         str(ppt_path)
-    ])
+    ], check=True)
 
     return pdf
 
+
+# --------------------------------------------------
+# Prepare dataset folder
+# --------------------------------------------------
 
 def prepare_dataset(ppts, videos):
 
@@ -102,12 +122,23 @@ def prepare_dataset(ppts, videos):
     return lecture_dir
 
 
-def run_pipeline():
+# --------------------------------------------------
+# Run dataset pipeline only for created lecture
+# --------------------------------------------------
+
+def run_pipeline(lecture_dir):
 
     from app.run_dataset import main
 
-    main(limit=1)
+    print("\n🚀 STARTING DATASET PIPELINE")
+    print("Processing:", lecture_dir)
 
+    main()
+
+
+# --------------------------------------------------
+# Main entry
+# --------------------------------------------------
 
 def main():
 
@@ -132,9 +163,9 @@ def main():
         args.videos or []
     )
 
-    print("Prepared dataset:", lecture_dir)
+    print("\nPrepared dataset:", lecture_dir)
 
-    run_pipeline()
+    run_pipeline(lecture_dir)
 
 
 if __name__ == "__main__":

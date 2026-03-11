@@ -44,14 +44,18 @@ def main(limit: int = 0):
 
     lectures = scan_dataset(DATA_DIR)
 
+    # ---------------- RUN ONLY LATEST LECTURE ----------------
+    if lectures:
+        lectures = [max(lectures, key=lambda lf: lf.folder.stat().st_mtime)]
+
     if limit:
         lectures = lectures[:limit]
 
     for lf in lectures:
 
-        print("\n" + "="*70)
-        print(f"📚 Processing Lecture {lf.lecture_num}")
-        print("="*70)
+        print("\n" + "=" * 70)
+        print(f"📚 Processing {lf.folder.name}")
+        print("=" * 70)
 
         out = outputs_dir(lf.folder)
         out.mkdir(parents=True, exist_ok=True)
@@ -231,7 +235,7 @@ def main(limit: int = 0):
                 encoding="utf-8"
             )
 
-        print(f"✅ Lecture {lf.lecture_num:02d} finished")
+        print(f"✅ {lf.folder.name} finished")
 
 
 if __name__ == "__main__":
