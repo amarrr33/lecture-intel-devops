@@ -2,15 +2,14 @@ pipeline {
     agent any
 
     environment {
-        GOOGLE_API_KEY = credentials('google-api-key') 
-        DOCKER = '"C:/Program Files/Docker/Docker/resources/bin/docker.exe"'
+        GOOGLE_API_KEY = credentials('google-api-key')
     }
 
     stages {
 
         stage('Checkout') {
             steps {
-                git url:"https://github.com/amarrr33/lecture-intel-devops.git", branch:"koushik"
+                git url: "https://github.com/amarrr33/lecture-intel-devops.git", branch: "koushik"
             }
         }
 
@@ -22,46 +21,57 @@ pipeline {
 
         stage('YouTube Test') {
             steps {
-                bat '''
-                docker run --rm lecture-ai \
+                bat """
+                docker run --rm ^
+                -v %cd%:/app ^
+                lecture-ai ^
                 python -m app.smart_run --videos https://youtu.be/M988_fsOSWo?si=rojozvBGHEbkXEX6
-                '''
+                """
             }
         }
 
         stage('PPT Test') {
             steps {
-                bat '''
-                docker run --rm lecture-ai \
+                bat """
+                docker run --rm ^
+                -v %cd%:/app ^
+                lecture-ai ^
                 python -m app.smart_run --ppt cloud.pptx
-                '''
+                """
             }
         }
 
         stage('Audio Test') {
             steps {
-                bat '''
-                docker run --rm lecture-ai \
+                bat """
+                docker run --rm ^
+                -v %cd%:/app ^
+                lecture-ai ^
                 python -m app.smart_run --audio short.mp3
-                '''
+                """
             }
         }
 
         stage('API Test') {
             steps {
-                bat '''
-                docker run --rm -e GOOGLE_API_KEY=$GOOGLE_API_KEY lecture-ai \
+                bat """
+                docker run --rm ^
+                -e GOOGLE_API_KEY=%GOOGLE_API_KEY% ^
+                lecture-ai ^
                 python test_api.py
-                '''
+                """
             }
         }
 
         stage('Full Pipeline Test') {
             steps {
-                bat '''
-                docker run --rm -e GOOGLE_API_KEY=$GOOGLE_API_KEY lecture-ai \
+                bat """
+                docker run --rm ^
+                -v %cd%:/app ^
+                -e GOOGLE_API_KEY=%GOOGLE_API_KEY% ^
+                lecture-ai ^
                 python -m app.smart_run --ppt cloud.pptx --audio short.mp3
-                '''
+                """
             }
         }
     }
