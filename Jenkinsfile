@@ -16,13 +16,13 @@ pipeline {
 
         stage('Build Docker Image') {
             steps {
-                sh 'docker build -t lecture-ai .'
+                bat 'docker build -t lecture-ai .'
             }
         }
 
         stage('YouTube Test') {
             steps {
-                sh '''
+                bat '''
                 docker run --rm lecture-ai \
                 python -m app.smart_run --videos https://youtu.be/M988_fsOSWo?si=rojozvBGHEbkXEX6
                 '''
@@ -31,7 +31,7 @@ pipeline {
 
         stage('PPT Test') {
             steps {
-                sh '''
+                bat '''
                 docker run --rm lecture-ai \
                 python -m app.smart_run --ppt cloud.pptx
                 '''
@@ -40,7 +40,7 @@ pipeline {
 
         stage('Audio Test') {
             steps {
-                sh '''
+                bat '''
                 docker run --rm lecture-ai \
                 python -m app.smart_run --audio short.mp3
                 '''
@@ -49,7 +49,7 @@ pipeline {
 
         stage('API Test') {
             steps {
-                sh '''
+                bat '''
                 docker run --rm -e GOOGLE_API_KEY=$GOOGLE_API_KEY lecture-ai \
                 python test_api.py
                 '''
@@ -58,7 +58,7 @@ pipeline {
 
         stage('Full Pipeline Test') {
             steps {
-                sh '''
+                bat '''
                 docker run --rm -e GOOGLE_API_KEY=$GOOGLE_API_KEY lecture-ai \
                 python -m app.smart_run --ppt cloud.pptx --audio short.mp3
                 '''
