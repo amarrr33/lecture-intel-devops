@@ -1,46 +1,77 @@
 pipeline {
-  agent any
+    agent any
 
-  environment {
-    IMAGE_NAME = "amarender01/lecture-intel"
-    IMAGE_TAG  = "latest"
-    DOCKERHUB_CREDS = "dockerhub-creds"   // Jenkins Credentials ID (Username+Password)
-    DEPLOY_HOST = "your.server.ip"        // or hostname
-    DEPLOY_USER = "ubuntu"                // change if needed
-    SSH_CREDS   = "server-ssh-key"        // Jenkins SSH private key Credentials ID
-  }
-
-  stages {
-    stage('Checkout') {
-      steps { checkout scm }
+    environment {
+        GOOGLE_API_KEY = credentials('google-api-key') 
+        DOCKER = '"C:/Program Files/Docker/Docker/resources/bin/docker.exe"'
     }
 
-    stage('Basic Tests') {
-      steps {
-        sh '''
-          python3 -V || true
-          ls -la
-          test -f app/main.py
-          test -f Dockerfile
-        '''
-      }
-    }
+    stages {
 
-    stage('Build Docker Image') {
-      steps {
-        sh 'docker build -t $IMAGE_NAME:$IMAGE_TAG .'
-      }
-    }
-
-    stage('Push to DockerHub') {
-      steps {
-        withCredentials([usernamePassword(credentialsId: "$DOCKERHUB_CREDS", usernameVariable: 'DH_USER', passwordVariable: 'DH_PASS')]) {
-          sh '''
-            echo "$DH_PASS" | docker login -u "$DH_USER" --password-stdin
-            docker push $IMAGE_NAME:$IMAGE_TAG
-          '''
+        stage('Checkout') {
+            steps {
+                git url:"C:/Users/koush/Downloads/lecture-intel-devops", branch:"master"
+            }
         }
-      }
-    }   
-  }
+
+        stage('Build Docker Image') {
+            steps {
+                sh 'docker build -t lecture-ai .'
+            }
+        }
+
+        stage('YouTube Test') {
+            steps {
+                sh '''
+                docker run --rm lecture-ai \
+                python -m app.smart_run --videos https://youtu.be/M988_fsOSWo?si=rojozvBGHEbkXEX6
+                '''
+            }
+        }
+
+        stage('PPT Test') {
+            steps {
+                sh '''
+                docker run --rm lecture-ai \
+                python -m app.smart_run --ppt cloud.pptx
+                '''
+            }
+        }
+
+        stage('Audio Test') {
+            steps {
+                sh '''
+                docker run --rm lecture-ai \
+                python -m app.smart_run --audio short.mp3
+                '''
+            }
+        }
+
+        stage('API Test') {
+            steps {
+                sh '''
+                docker run --rm -e GOOGLE_API_KEY=$GOOGLE_API_KEY lecture-ai \
+                python test_api.py
+                '''
+            }
+        }
+
+        stage('Full Pipeline Test') {
+            steps {
+                sh '''
+                docker run --rm -e GOOGLE_API_KEY=$GOOGLE_API_KEY lecture-ai \
+                python -m app.smart_run --ppt cloud.pptx --audio short.mp3
+                '''
+            }
+        }
+    }
+
+    post {
+        success {
+            echo '✅ All tests passed'
+        }
+        failure {
+            echo '❌ Pipeline failed'
+        }
+    }
 }
