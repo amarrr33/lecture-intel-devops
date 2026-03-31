@@ -10,7 +10,7 @@ pipeline {
 
         stage('Checkout') {
             steps {
-                git url:"C:/Users/koush/Downloads/lecture-intel-devops", branch:"master"
+                git url:"https://github.com/amarrr33/lecture-intel-devops.git", branch:"koushik"
             }
         }
 
