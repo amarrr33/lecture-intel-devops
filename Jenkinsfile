@@ -13,12 +13,6 @@ pipeline {
             }
         }
 
-        stage('Clean Whisper cache') {
-            steps{
-                bat 'docker run --rm -v %WORKSPACE%:/app lecture-ai bash -c "rm -rf /root/.cache/whisper"'
-            }
-        }
-
         stage('Clean Workspace (IMPORTANT)') {
             steps {
                 bat 'rmdir /s /q data\\lectures || exit 0'
@@ -28,6 +22,11 @@ pipeline {
         stage('Build Docker Image') {
             steps {
                 bat 'docker build -t lecture-ai .'
+            }
+        }
+        stage('Clean Whisper cache') {
+            steps{
+                bat 'docker run --rm -v %WORKSPACE%:/app lecture-ai bash -c "rm -rf /root/.cache/whisper"'
             }
         }
 
