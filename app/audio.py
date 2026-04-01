@@ -41,19 +41,17 @@ def normalize_to_wav16k(in_path: str | Path, out_path: str | Path) -> Path:
     return out_path
 
 
-# ---------------------------
-# 🔥 WHISPER FIXED
-# ---------------------------
-def load_whisper_model(model_size: str):
-    import whisper
+import shutil
+import os
 
+def load_whisper_model(model_size):
     try:
         return whisper.load_model(model_size)
-    except RuntimeError:
-        # 🔥 fix corrupted download
-        cache = Path.home() / ".cache" / "whisper"
-        if cache.exists():
-            shutil.rmtree(cache)
+    except Exception as e:
+        print("⚠️ Corrupted model, clearing cache...")
+
+        cache_dir = os.path.expanduser("~/.cache/whisper")
+        shutil.rmtree(cache_dir, ignore_errors=True)
 
         return whisper.load_model(model_size)
 
