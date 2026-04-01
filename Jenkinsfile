@@ -23,7 +23,7 @@ pipeline {
             steps {
                 bat """
                 docker run --rm ^
-                -v %cd%:/app ^
+                -v %WORKSPACE%:/app ^
                 lecture-ai ^
                 python -m app.smart_run --videos https://youtu.be/M988_fsOSWo?si=rojozvBGHEbkXEX6
                 """
@@ -34,7 +34,7 @@ pipeline {
             steps {
                 bat """
                 docker run --rm ^
-                -v %cd%:/app ^
+                -v %WORKSPACE%:/app ^
                 lecture-ai ^
                 python -m app.smart_run --ppt cloud.pptx
                 """
@@ -45,7 +45,7 @@ pipeline {
             steps {
                 bat """
                 docker run --rm ^
-                -v %cd%:/app ^
+                -v %WORKSPACE%:/app ^
                 lecture-ai ^
                 python -m app.smart_run --audio short.mp3
                 """
@@ -67,7 +67,7 @@ pipeline {
             steps {
                 bat """
                 docker run --rm ^
-                -v %cd%:/app ^
+                -v %WORKSPACE%:/app ^
                 -e GOOGLE_API_KEY=%GOOGLE_API_KEY% ^
                 lecture-ai ^
                 python -m app.smart_run --ppt cloud.pptx --audio short.mp3
