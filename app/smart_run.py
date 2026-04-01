@@ -15,7 +15,7 @@ def download_youtube_audio(url, out_dir):
     out = out_dir / f"{uuid.uuid4()}.mp3"
 
     ydl_opts = {
-        'format': 'bestaudio/best',  # stable in Docker
+        'format': 'bestaudio/best',
         'outtmpl': str(out.with_suffix(".%(ext)s")),
         'noplaylist': True,
         'quiet': False,
@@ -29,6 +29,7 @@ def download_youtube_audio(url, out_dir):
         ydl.download([url])
 
     return out
+
 
 # --------------------------------------------------
 # Merge multiple audio files
@@ -55,6 +56,7 @@ def merge_audios(audio_files, out_path):
     subprocess.run(cmd, check=True)
     return out_path
 
+
 # --------------------------------------------------
 # Convert PPT → PDF
 # --------------------------------------------------
@@ -73,9 +75,10 @@ def convert_ppt_to_pdf(ppt_path):
         "--convert-to", "pdf",
         "--outdir", str(ppt_path.parent),
         str(ppt_path)
-    ], check=False)  # LibreOffice false errors
+    ], check=False)
 
     return pdf
+
 
 # --------------------------------------------------
 # Prepare dataset
@@ -101,10 +104,9 @@ def prepare_dataset(ppts, videos, audios):
 
         shutil.copy(pdf, lecture_dir / "slides.pdf")
 
-    # ---------------- AUDIO (LOCAL + YOUTUBE) ----------------
+    # ---------------- AUDIO ----------------
     audio_files = []
 
-    # Local audio
     if audios:
         for a in audios:
             a_path = Path(a)
@@ -115,7 +117,7 @@ def prepare_dataset(ppts, videos, audios):
             shutil.copy(a_path, temp_audio)
             audio_files.append(temp_audio)
 
-    # YouTube (optional)
+    # ---------------- YouTube ----------------
     for v in videos:
         print("Downloading:", v)
         try:
@@ -124,15 +126,15 @@ def prepare_dataset(ppts, videos, audios):
         except Exception as e:
             print(f"❌ Failed: {v} -> {e}")
 
-    # Merge → final standard file
     if audio_files:
-        final_audio = lecture_dir / "audio.mp3"   # 🔥 REQUIRED NAME
+        final_audio = lecture_dir / "audio.mp3"
         merge_audios(audio_files, final_audio)
 
     return lecture_dir
 
+
 # --------------------------------------------------
-# Run pipeline
+# 🚀 FIXED RUN PIPELINE (IMPORTANT)
 # --------------------------------------------------
 
 def run_pipeline(lecture_dir):
@@ -141,7 +143,9 @@ def run_pipeline(lecture_dir):
     print("\n🚀 STARTING PIPELINE")
     print("Processing:", lecture_dir)
 
-    main()
+    # ✅ ONLY process this lecture
+    main(target_dir=lecture_dir)
+
 
 # --------------------------------------------------
 # Main
@@ -165,6 +169,7 @@ def main():
     print("\nPrepared dataset:", lecture_dir)
 
     run_pipeline(lecture_dir)
+
 
 if __name__ == "__main__":
     main()
