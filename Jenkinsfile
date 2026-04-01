@@ -13,6 +13,12 @@ pipeline {
             }
         }
 
+        stage('Clean Workspace (IMPORTANT)') {
+            steps {
+                bat 'rmdir /s /q data\\lectures || exit 0'
+            }
+        }
+
         stage('Build Docker Image') {
             steps {
                 bat 'docker build -t lecture-ai .'
@@ -24,6 +30,7 @@ pipeline {
                 bat """
                 docker run --rm ^
                 -v %WORKSPACE%:/app ^
+                -e GOOGLE_API_KEY=%GOOGLE_API_KEY% ^
                 lecture-ai ^
                 python -m app.smart_run --videos https://youtu.be/M988_fsOSWo?si=rojozvBGHEbkXEX6
                 """
@@ -35,6 +42,7 @@ pipeline {
                 bat """
                 docker run --rm ^
                 -v %WORKSPACE%:/app ^
+                -e GOOGLE_API_KEY=%GOOGLE_API_KEY% ^
                 lecture-ai ^
                 python -m app.smart_run --ppt cloud.pptx
                 """
@@ -46,6 +54,7 @@ pipeline {
                 bat """
                 docker run --rm ^
                 -v %WORKSPACE%:/app ^
+                -e GOOGLE_API_KEY=%GOOGLE_API_KEY% ^
                 lecture-ai ^
                 python -m app.smart_run --audio short.mp3
                 """
