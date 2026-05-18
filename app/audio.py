@@ -1,5 +1,5 @@
 from __future__ import annotations
-
+import whisper
 import shutil
 import subprocess
 from pathlib import Path
@@ -41,21 +41,26 @@ def normalize_to_wav16k(in_path: str | Path, out_path: str | Path) -> Path:
     return out_path
 
 
-# ---------------------------
-# 🔥 WHISPER FIXED
-# ---------------------------
-def load_whisper_model(model_size: str):
-    import whisper
+import whisper
+import shutil
+from pathlib import Path
+import time
 
-    try:
-        return whisper.load_model(model_size)
-    except RuntimeError:
-        # 🔥 fix corrupted download
-        cache = Path.home() / ".cache" / "whisper"
-        if cache.exists():
-            shutil.rmtree(cache)
+def load_whisper_model(model_size, retries=3):
+    for attempt in range(retries):
+        try:
+            print(f"🔄 Loading Whisper model (attempt {attempt+1})")
+            return whisper.load_model(model_size)
 
-        return whisper.load_model(model_size)
+        except Exception as e:
+            print("⚠️ Model corrupted, clearing cache...", str(e))
+
+            cache_dir = Path.home() / ".cache" / "whisper"
+            shutil.rmtree(cache_dir, ignore_errors=True)
+
+            time.sleep(2)
+
+    raise RuntimeError("❌ Failed to load Whisper model after retries")
 
 
 def transcribe_whisper(

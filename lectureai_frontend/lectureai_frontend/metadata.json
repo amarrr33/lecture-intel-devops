@@ -1,0 +1,5 @@
+{
+  "name": "LectureAI",
+  "description": "Convert lectures into structured learning material using AI. Upload PPTs and YouTube links to generate notes, summaries, flashcards, and Q&A.",
+  "requestFramePermissions": []
+}

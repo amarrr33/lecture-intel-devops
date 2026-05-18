@@ -1,13 +1,14 @@
 import React, { useState } from 'react';
-import { Upload, Youtube, Plus, X, FileType, Loader2 } from 'lucide-react';
+import { Upload, Youtube, Plus, X, FileType, Loader2, Music } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
 
 interface UploadFormProps {
-  onUpload: (ppt: File | null, links: string[]) => Promise<void> | void;
+  onUpload: (ppt: File | null, links: string[], audio: File | null) => Promise<void> | void;
 }
 
 export function UploadForm({ onUpload }: UploadFormProps) {
   const [ppt, setPpt] = useState<File | null>(null);
+  const [audio, setAudio] = useState<File | null>(null);
   const [links, setLinks] = useState<string[]>(['']);
   const [isSubmitting, setIsSubmitting] = useState(false);
 
@@ -26,8 +27,13 @@ export function UploadForm({ onUpload }: UploadFormProps) {
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (isSubmitting) return;
+    const cleanedLinks = links.filter(l => l.trim() !== '');
+    if (!audio && cleanedLinks.length === 0) {
+      alert("Please provide either an audio file or at least one YouTube link.");
+      return;
+    }
     setIsSubmitting(true);
-    await onUpload(ppt, links.filter(l => l.trim() !== ''));
+    await onUpload(ppt, cleanedLinks, audio);
     setIsSubmitting(false);
   };
 
@@ -38,7 +44,7 @@ export function UploadForm({ onUpload }: UploadFormProps) {
       className="max-w-2xl mx-auto p-8 bg-white rounded-3xl shadow-xl border border-black/5"
     >
       <h2 className="text-3xl font-bold tracking-tight text-zinc-900 mb-2">Create Study Material</h2>
-      <p className="text-zinc-500 mb-8">Upload your lecture slides and YouTube links to get started.</p>
+      <p className="text-zinc-500 mb-8">Upload slides, then choose either an audio file or YouTube links.</p>
 
       <form onSubmit={handleSubmit} className="space-y-8">
         {/* PPT Upload */}
@@ -67,6 +73,38 @@ export function UploadForm({ onUpload }: UploadFormProps) {
                   <Upload className="w-12 h-12 text-zinc-300 mb-3" />
                   <p className="font-medium text-zinc-900">Click or drag to upload</p>
                   <p className="text-sm text-zinc-500">Supports PPT, PPTX, and PDF</p>
+                </>
+              )}
+            </div>
+          </div>
+        </div>
+
+        {/* Audio Upload (Optional alternative to links) */}
+        <div className="space-y-3">
+          <label className="text-sm font-semibold uppercase tracking-wider text-zinc-400">Lecture Audio (Optional)</label>
+          <div
+            className={`relative border-2 border-dashed rounded-2xl p-8 transition-all ${
+              audio ? 'border-emerald-500 bg-emerald-50/50' : 'border-zinc-200 hover:border-zinc-300'
+            }`}
+          >
+            <input
+              type="file"
+              accept=".wav,.mp3,.webm,.m4a,.aac,.flac,.ogg"
+              onChange={(e) => setAudio(e.target.files?.[0] || null)}
+              className="absolute inset-0 w-full h-full opacity-0 cursor-pointer"
+            />
+            <div className="flex flex-col items-center justify-center text-center">
+              {audio ? (
+                <>
+                  <Music className="w-12 h-12 text-emerald-500 mb-3" />
+                  <p className="font-medium text-zinc-900">{audio.name}</p>
+                  <p className="text-sm text-zinc-500">{(audio.size / 1024 / 1024).toFixed(2)} MB</p>
+                </>
+              ) : (
+                <>
+                  <Music className="w-12 h-12 text-zinc-300 mb-3" />
+                  <p className="font-medium text-zinc-900">Click or drag to upload audio</p>
+                  <p className="text-sm text-zinc-500">If audio is uploaded, YouTube links are optional</p>
                 </>
               )}
             </div>

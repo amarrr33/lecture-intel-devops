@@ -42,9 +42,13 @@ export default function App() {
   const [result, setResult] = useState<LectureResult | null>(null);
   const [error, setError] = useState<string | null>(null);
 
-  const handleUpload = async (ppt: File | null, links: string[]) => {
+  const handleUpload = async (ppt: File | null, links: string[], audio: File | null) => {
     if (!ppt) {
       alert("Please upload a presentation file (PPT/PDF).");
+      return;
+    }
+    if (!audio && links.length === 0) {
+      alert("Please provide either an audio file or at least one YouTube link.");
       return;
     }
     
@@ -54,6 +58,9 @@ export default function App() {
     const formData = new FormData();
     formData.append('ppt', ppt);
     formData.append('links', JSON.stringify(links));
+    if (audio) {
+      formData.append('audio', audio);
+    }
 
     try {
       const controller = new AbortController();

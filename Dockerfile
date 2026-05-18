@@ -1,35 +1,35 @@
-FROM python:3.10-slim
+FROM python:3.10
 
+RUN pip install numpy==1.26.4
 # --------------------------------------------------
 # Install system dependencies
 # --------------------------------------------------
-
 RUN apt-get update && apt-get install -y --no-install-recommends \
     ffmpeg \
     libreoffice \
+    tesseract-ocr \
     curl \
     wget \
     && rm -rf /var/lib/apt/lists/*
 
+
+
 # --------------------------------------------------
 # Set working directory
 # --------------------------------------------------
-
 WORKDIR /app
 
-COPY requirements.txt requirements.txt
+COPY requirements.txt .
 
 # --------------------------------------------------
 # Upgrade pip tools
 # --------------------------------------------------
-
-RUN pip install --upgrade pip setuptools wheel
+RUN python3 -m pip install --upgrade pip setuptools wheel
 
 # --------------------------------------------------
 # Install PyTorch CPU
 # --------------------------------------------------
-
-RUN pip install --no-cache-dir \
+RUN python3 -m pip install --no-cache-dir \
     torch==2.2.2+cpu \
     torchvision==0.17.2+cpu \
     torchaudio==2.2.2+cpu \
@@ -38,40 +38,24 @@ RUN pip install --no-cache-dir \
 # --------------------------------------------------
 # Install Whisper
 # --------------------------------------------------
-
-RUN pip install --no-cache-dir openai-whisper
-
-# --------------------------------------------------
-# Install YouTube downloader
-# --------------------------------------------------
-
-RUN pip install yt-dlp
+RUN python3 -m pip install --no-cache-dir openai-whisper
 
 # --------------------------------------------------
 # Install project requirements
 # --------------------------------------------------
+RUN python3 -m pip install --no-cache-dir -r requirements.txt
 
-RUN pip install -r requirements.txt
-
-# --------------------------------------------------
-# Fix dependency conflicts
-# --------------------------------------------------
-
-RUN pip uninstall -y numpy requests && \
-    pip install numpy==1.26.4 requests==2.31.0
-
+RUN python -c "import whisper; whisper.load_model('base')"
 # --------------------------------------------------
 # Copy project files
 # --------------------------------------------------
-
-COPY . /app
+COPY . .
 
 ENV PYTHONPATH=/app
 
 # --------------------------------------------------
 # Expose API
 # --------------------------------------------------
-
 EXPOSE 8000
 
-CMD ["uvicorn", "app.main:app", "--host", "0.0.0.0", "--port", "8000"]
+CMD ["python3", "-m", "uvicorn", "app.main:app", "--host", "0.0.0.0", "--port", "8000"]

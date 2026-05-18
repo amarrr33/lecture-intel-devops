@@ -189,6 +189,7 @@ def _download_and_merge_links(links: List[str], run_dir: Path) -> Path:
 async def process_upload(
     ppt: UploadFile = File(...),
     links: str = Form(default="[]"),
+    audio: UploadFile | None = File(default=None),
 ) -> Dict[str, Any]:
     """
     Frontend-compatible endpoint:
@@ -211,13 +212,28 @@ async def process_upload(
     payload = await ppt.read()
     slides_path.write_bytes(payload)
 
-    if not parsed_links:
-        raise HTTPException(
-            status_code=400,
-            detail="At least one YouTube link is required.",
+    if audio is not None:
+        audio_name = Path(audio.filename or "input_audio.webm").name
+        audio_path = inputs_dir / audio_name
+        audio_payload = await audio.read()
+        audio_path.write_bytes(audio_payload)
+        combined_audio_path = run_dir / f"combined_audio{audio_path.suffix.lower() or '.webm'}"
+        shutil.copy(audio_path, combined_audio_path)
+        save_json(
+            {
+                "mode": "uploaded_audio",
+                "uploaded_audio": str(audio_path),
+                "combined_audio": str(combined_audio_path),
+            },
+            run_dir / "link_processing.json",
         )
-
-    combined_audio_path = _download_and_merge_links(parsed_links, run_dir)
+    else:
+        if not parsed_links:
+            raise HTTPException(
+                status_code=400,
+                detail="Provide either an audio file or at least one YouTube link.",
+            )
+        combined_audio_path = _download_and_merge_links(parsed_links, run_dir)
 
     req = ProcessRequest(
         audio_path=str(combined_audio_path),
@@ -249,6 +265,7 @@ async def process_upload(
             "slides_file": str(slides_path),
             "combined_audio": str(combined_audio_path),
             "links": parsed_links,
+            "used_uploaded_audio": audio is not None,
             "output_folder": str(run_dir),
         },
         run_dir / "metadata.json",

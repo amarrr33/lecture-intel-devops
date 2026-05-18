@@ -10,7 +10,6 @@ from app.topic_segmenter import extract_topics
 from app.generate import (
     generate_slidewise_notes,
     generate_lecture_materials,
-    flashcards_to_markdown,
 )
 
 DATA_DIR = Path("data/lectures")
@@ -28,7 +27,6 @@ def build_topic_map(topics):
 
 
 def get_topic_for_segment(segment, topic_map):
-
     s = segment.get("start", 0.0)
 
     for t in topic_map:
@@ -38,18 +36,26 @@ def get_topic_for_segment(segment, topic_map):
     return ""
 
 
-def main(limit: int = 0):
+# 🔥 UPDATED MAIN FUNCTION
+def main(limit: int = 0, target_dir=None):
 
     print("\n🚀 STARTING DATASET PIPELINE")
 
-    lectures = scan_dataset(DATA_DIR)
+    # ✅ FIX: handle specific lecture
+    if target_dir:
+        lectures = scan_dataset(target_dir.parent)
+        lectures = [lf for lf in lectures if lf.folder == target_dir]
+    else:
+        lectures = scan_dataset(DATA_DIR)
 
-    # ---------------- RUN ONLY LATEST LECTURE ----------------
-    if lectures:
+    # (optional fallback)
+    if not target_dir and lectures:
         lectures = [max(lectures, key=lambda lf: lf.folder.stat().st_mtime)]
 
     if limit:
         lectures = lectures[:limit]
+
+    print(f"✅ Found {len(lectures)} valid lectures")
 
     for lf in lectures:
 
@@ -61,7 +67,6 @@ def main(limit: int = 0):
         out.mkdir(parents=True, exist_ok=True)
 
         # ---------------- METADATA ----------------
-
         meta = {
             "lecture": lf.lecture_num,
             "audio": lf.audio.name if lf.audio else None,
@@ -74,17 +79,13 @@ def main(limit: int = 0):
         )
 
         # ---------------- TRANSCRIPT ----------------
-
         transcript = None
 
         if lf.audio:
-
             tpath = out / "transcript.json"
 
             if tpath.exists():
-                transcript = json.loads(
-                    tpath.read_text(encoding="utf-8")
-                )
+                transcript = json.loads(tpath.read_text(encoding="utf-8"))
             else:
                 transcript = transcribe_whisper(
                     lf.audio,
@@ -97,17 +98,13 @@ def main(limit: int = 0):
                 )
 
         # ---------------- SLIDES ----------------
-
         slides_payload = None
 
         if lf.slides:
-
             spath = out / "slides.json"
 
             if spath.exists():
-                slides_payload = json.loads(
-                    spath.read_text(encoding="utf-8")
-                )
+                slides_payload = json.loads(spath.read_text(encoding="utf-8"))
             else:
                 slides = load_slides(lf.slides)
 
@@ -121,19 +118,15 @@ def main(limit: int = 0):
                     encoding="utf-8"
                 )
 
-        # ---------------- TOPIC SEGMENTATION ----------------
-
+        # ---------------- TOPICS ----------------
         topics = None
         topic_map = []
 
         if transcript:
-
             tpath = out / "topics.json"
 
             if tpath.exists():
-                topics = json.loads(
-                    tpath.read_text(encoding="utf-8")
-                )
+                topics = json.loads(tpath.read_text(encoding="utf-8"))
             else:
                 topics = extract_topics(transcript["segments"])
 
@@ -145,17 +138,13 @@ def main(limit: int = 0):
             topic_map = build_topic_map(topics)
 
         # ---------------- ALIGNMENT ----------------
-
         aligned = None
 
         if transcript and slides_payload:
-
             apath = out / "alignment.json"
 
             if apath.exists():
-                aligned = json.loads(
-                    apath.read_text(encoding="utf-8")
-                )
+                aligned = json.loads(apath.read_text(encoding="utf-8"))
             else:
                 aligned = align_slides_to_transcript(
                     slides_payload,
@@ -168,19 +157,13 @@ def main(limit: int = 0):
                 )
 
         # ---------------- NOTES ----------------
-
         if aligned:
-
             enriched_alignments = []
 
             for a in aligned["alignments"]:
-
                 seg = a["segment"]
 
-                topic_text = get_topic_for_segment(
-                    seg,
-                    topic_map
-                )
+                topic_text = get_topic_for_segment(seg, topic_map)
 
                 enriched_alignments.append({
                     **a,
@@ -198,9 +181,7 @@ def main(limit: int = 0):
             )
 
         # ---------------- MATERIALS ----------------
-
         if transcript:
-
             print("📄 Generating summary / flashcards / questions")
 
             materials = generate_lecture_materials(transcript)
@@ -221,18 +202,6 @@ def main(limit: int = 0):
 
             (out / "questions_with_answers.json").write_text(
                 json.dumps(qa, indent=2)
-            )
-
-            # Debug outputs
-
-            (out / "debug_flash_raw.txt").write_text(
-                str(flashcards),
-                encoding="utf-8"
-            )
-
-            (out / "debug_qa_raw.txt").write_text(
-                str(qa),
-                encoding="utf-8"
             )
 
         print(f"✅ {lf.folder.name} finished")

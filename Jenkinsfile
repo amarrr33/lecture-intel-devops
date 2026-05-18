@@ -1,46 +1,101 @@
 pipeline {
-  agent any
+    agent any
 
-  environment {
-    IMAGE_NAME = "amarender01/lecture-intel"
-    IMAGE_TAG  = "latest"
-    DOCKERHUB_CREDS = "dockerhub-creds"   // Jenkins Credentials ID (Username+Password)
-    DEPLOY_HOST = "your.server.ip"        // or hostname
-    DEPLOY_USER = "ubuntu"                // change if needed
-    SSH_CREDS   = "server-ssh-key"        // Jenkins SSH private key Credentials ID
-  }
-
-  stages {
-    stage('Checkout') {
-      steps { checkout scm }
+    environment {
+        GOOGLE_API_KEY = credentials('google-api-key')
     }
 
-    stage('Basic Tests') {
-      steps {
-        sh '''
-          python3 -V || true
-          ls -la
-          test -f app/main.py
-          test -f Dockerfile
-        '''
-      }
-    }
+    stages {
 
-    stage('Build Docker Image') {
-      steps {
-        sh 'docker build -t $IMAGE_NAME:$IMAGE_TAG .'
-      }
-    }
-
-    stage('Push to DockerHub') {
-      steps {
-        withCredentials([usernamePassword(credentialsId: "$DOCKERHUB_CREDS", usernameVariable: 'DH_USER', passwordVariable: 'DH_PASS')]) {
-          sh '''
-            echo "$DH_PASS" | docker login -u "$DH_USER" --password-stdin
-            docker push $IMAGE_NAME:$IMAGE_TAG
-          '''
+        stage('Checkout') {
+            steps {
+                git url: "https://github.com/amarrr33/lecture-intel-devops.git", branch: "koushik"
+            }
         }
-      }
-    }   
-  }
+
+        stage('Clean Workspace (IMPORTANT)') {
+            steps {
+                bat 'rmdir /s /q data\\lectures || exit 0'
+            }
+        }
+
+        stage('Build Docker Image') {
+            steps {
+                bat 'docker build -t lecture-ai .'
+            }
+        }
+        stage('Clean Whisper cache') {
+            steps{
+                bat 'docker run --rm -v %WORKSPACE%:/app lecture-ai bash -c "rm -rf /root/.cache/whisper"'
+            }
+        }
+
+        stage('YouTube Test') {
+            steps {
+                bat """
+                docker run --rm ^
+                -v %WORKSPACE%:/app ^
+                -e GOOGLE_API_KEY=%GOOGLE_API_KEY% ^
+                lecture-ai ^
+                python -m app.smart_run --videos https://youtu.be/M988_fsOSWo?si=rojozvBGHEbkXEX6
+                """
+            }
+        }
+
+        stage('PPT Test') {
+            steps {
+                bat """
+                docker run --rm ^
+                -v %WORKSPACE%:/app ^
+                -e GOOGLE_API_KEY=%GOOGLE_API_KEY% ^
+                lecture-ai ^
+                python -m app.smart_run --ppt cloud.pptx
+                """
+            }
+        }
+
+        stage('Audio Test') {
+            steps {
+                bat """
+                docker run --rm ^
+                -v %WORKSPACE%:/app ^
+                -e GOOGLE_API_KEY=%GOOGLE_API_KEY% ^
+                lecture-ai ^
+                python -m app.smart_run --audio short.mp3
+                """
+            }
+        }
+
+        stage('API Test') {
+            steps {
+                bat """
+                docker run --rm ^
+                -e GOOGLE_API_KEY=%GOOGLE_API_KEY% ^
+                lecture-ai ^
+                python test_api.py
+                """
+            }
+        }
+
+        stage('Full Pipeline Test') {
+            steps {
+                bat """
+                docker run --rm ^
+                -v %WORKSPACE%:/app ^
+                -e GOOGLE_API_KEY=%GOOGLE_API_KEY% ^
+                lecture-ai ^
+                python -m app.smart_run --ppt cloud.pptx --audio short.mp3
+                """
+            }
+        }
+    }
+
+    post {
+        success {
+            echo '✅ All tests passed'
+        }
+        failure {
+            echo '❌ Pipeline failed'
+        }
+    }
 }
